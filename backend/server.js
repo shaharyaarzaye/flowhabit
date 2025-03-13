@@ -2,6 +2,7 @@ import express from 'express'
 const app = express()
 import mongoose from 'mongoose';
 import {User} from './models/users.js'
+import cors from 'cors'
 mongoose.connect('mongodb://127.0.0.1:27017/flowhabitdb');
 
 app.use(express.json());
