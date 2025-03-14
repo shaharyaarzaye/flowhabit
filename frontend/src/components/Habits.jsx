@@ -6,6 +6,8 @@ export const Habits = () => {
     const days = [];
     let recordObj = {};
 
+
+
     // Generate the last 4 days dynamically
     for (let i = 0; i < daysToDisplay; i++) {
         const day = today.getDate();
@@ -24,8 +26,18 @@ export const Habits = () => {
         }));
     };
     recordObj = {...habit}
-
     
+    fetch("https://redesigned-fiesta-46xv5jpg465cq4r5-3000.app.github.dev/api/data", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(recordObj)  // Convert object to JSON string
+    })
+    .then(response => response.json())
+    .then(result => console.log("Server Response:", result))
+    .catch(error => console.error("Error:", error));
+
 
 
     console.log("robj" , recordObj , "hab" , habit)
@@ -47,15 +59,16 @@ export const Habits = () => {
                 <div className="flex justify-between">
                     {days.map((date) => (
                         <div 
+                            className="cursor-pointer border px-3 py-1 rounded text-green-200 hover:bg-gray-100"
                             key={date} 
                             onClick={() =>{ 
                                 handleClick(date)
                             }
+
                                 
                             } 
-                            className="cursor-pointer border px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
                         >
-                            {habit[date] ? "Y" : "X"}  {/* Shows "Y" if true, "X" if false */}
+                            {habit[date] ? "✔️" : "❌"}  {/* Shows "Y" if true, "X" if false */}
                         </div>
                     ))}
                 </div>
