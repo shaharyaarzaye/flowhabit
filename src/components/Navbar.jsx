@@ -1,13 +1,18 @@
 import { FaPlus } from "react-icons/fa6";
 import { FaSort } from "react-icons/fa";
 import { BsThreeDotsVertical } from "react-icons/bs";
+import HabitAddTypePopup from "./HabitAddTypePopup";
+import { useState } from "react";
+
 
 function Navbar() {
+
+  const [ShowAddDialog , setShowAddDialog] = useState(false)
   return (
-    <div className="w-full text-white bg-black border-b border-b-zinc-600 md:px-10 md:py-4 p-2 flex justify-between items-center">
+    <div  className="w-full text-white bg-black border-b border-b-zinc-600 md:px-10 md:py-4 p-2 flex justify-between items-center">
       <p className="text-xl">FlowHabit</p>
       <div className="flex justify-between gap-1 md:gap-10">
-        <button className="p-2 rounded-full  hover:cursor-pointer hover:bg-neutral-600 transition-colors duration-200">
+        <button onClick={()=>{setShowAddDialog(true)}} className="p-2 rounded-full  hover:cursor-pointer hover:bg-neutral-600 transition-colors duration-200">
           <FaPlus className="text-lg" />
         </button>
         <button className="p-2 rounded-full hover:cursor-pointer  hover:bg-neutral-600 transition-colors duration-200">
@@ -17,6 +22,8 @@ function Navbar() {
           <BsThreeDotsVertical className="text-lg" />
         </button>
       </div>
+
+      {ShowAddDialog && <HabitAddTypePopup setShowAddDialog={setShowAddDialog}/>}
     </div>
   );
 }
