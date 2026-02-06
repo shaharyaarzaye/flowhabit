@@ -1,0 +1,21 @@
+import { pgTable, text, timestamp, boolean, uuid, integer, jsonb } from "drizzle-orm/pg-core";
+
+export const habits = pgTable("habits", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    description: text("description"),
+    icon: text("icon").default("Circle"),
+    color: text("color").default("#3b82f6"), // blue-500
+    frequency: jsonb("frequency").default({ type: "daily", days: [] }),
+    userId: text("user_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const completions = pgTable("completions", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    habitId: uuid("habit_id").references(() => habits.id, { onDelete: "cascade" }).notNull(),
+    date: text("date").notNull(), // YYYY-MM-DD
+    completed: boolean("completed").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
