@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Edit2, Trash2 } from "lucide-react";
@@ -30,7 +32,10 @@ export default function HabitCard({ id, name, icon: IconName, color, isCompleted
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            <div className="flex items-center gap-4">
+
+
+
+            <Link href={`/habits/${id}`} className="flex-1 flex items-center gap-4 cursor-pointer">
                 <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center text-white"
                     style={{ backgroundColor: color }}
@@ -42,7 +47,7 @@ export default function HabitCard({ id, name, icon: IconName, color, isCompleted
                     <h3 className="font-semibold text-foreground">{name}</h3>
                     <p className="text-xs text-muted-foreground italic">Daily</p>
                 </div>
-            </div>
+            </Link>
 
             <div className="flex items-center gap-3">
                 {isHovered && (

@@ -6,9 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.37.3",
     "@neondatabase/serverless": "^0.10.4",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -21,6 +25,7 @@
     "react": "19.2.3",
     "react-day-picker": "^9.5.1",
     "react-dom": "19.2.3",
+    "recharts": "^3.7.0",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {

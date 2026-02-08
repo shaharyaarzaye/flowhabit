@@ -17,18 +17,24 @@ export const metadata: Metadata = {
   description: "Track your habits with a minimalist and beautiful interface.",
 };
 
+import { ClerkProvider } from "@clerk/nextjs";
+
+// ... existing imports ...
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${inter.variable} ${outfit.variable} antialiased`}
-      >
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className="dark">
+        <body
+          className={`${inter.variable} ${outfit.variable} antialiased`}
+        >
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

@@ -1,32 +1,122 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import HabitCard from "./HabitCard";
 import { Plus, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import AddHabitModal from "./AddHabitModal";
 import { format, addDays, subDays, isSameDay } from "date-fns";
+import { getHabits, addHabit as addHabitAction, toggleHabitCompletion } from "@/app/actions";
 
-const MOCK_HABITS = [
-    { id: "1", name: "Read 10 pages", color: "#6366f1", icon: "Book", isCompleted: false },
-    { id: "2", name: "Drink Water", color: "#3b82f6", icon: "Droplets", isCompleted: true },
-    { id: "3", name: "Exercise", color: "#10b981", icon: "Dumbbell", isCompleted: false },
-    { id: "4", name: "Meditate", color: "#8b5cf6", icon: "Wind", isCompleted: false },
-];
+import { useUser, useClerk, UserButton } from "@clerk/nextjs";
+import { syncLocalHabits } from "@/app/syncActions";
+
+
 
 export default function HabitList() {
+    const { user, isLoaded } = useUser();
+    const { openSignIn } = useClerk();
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [habits, setHabits] = useState(MOCK_HABITS);
+    const [habits, setHabits] = useState<any[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const toggleHabit = (id: string) => {
+    // Sync local habits on login
+    useEffect(() => {
+        if (isLoaded && user) {
+            const stored = localStorage.getItem("localHabits");
+            if (stored) {
+                const localHabits = JSON.parse(stored);
+                if (localHabits.length > 0) {
+                    syncLocalHabits(localHabits).then(() => {
+                        localStorage.removeItem("localHabits");
+                        // Trigger refetch
+                        const dateStr = format(selectedDate, "yyyy-MM-dd");
+                        getHabits(dateStr).then(setHabits);
+                    });
+                }
+            }
+        }
+    }, [isLoaded, user]);
+
+    // Fetch habits (Server or Local)
+    useEffect(() => {
+        const fetchHabits = async () => {
+            setIsLoading(true);
+            if (isLoaded && user) {
+                const dateStr = format(selectedDate, "yyyy-MM-dd");
+                const data = await getHabits(dateStr);
+                setHabits(data);
+            } else if (isLoaded && !user) {
+                // Local storage mode
+                const stored = localStorage.getItem("localHabits");
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    // Reset completion if date changed? For simplicity, keeping as is for now 
+                    // or ideally we'd store completions separately.
+                    setHabits(parsed);
+                } else {
+                    setHabits([]);
+                }
+            }
+            setIsLoading(false);
+        };
+        fetchHabits();
+    }, [selectedDate, isLoaded, user]);
+
+    const toggleHabit = async (id: string) => {
+        const habitToToggle = habits.find(h => h.id === id);
+        if (!habitToToggle) return;
+
+        const newStatus = !habitToToggle.isCompleted;
+
+        // Optimistic update
         setHabits((prev) =>
-            prev.map((h) => (h.id === id ? { ...h, isCompleted: !h.isCompleted } : h))
+            prev.map((h) => (h.id === id ? { ...h, isCompleted: newStatus } : h))
         );
+
+        if (user) {
+            const dateStr = format(selectedDate, "yyyy-MM-dd");
+            await toggleHabitCompletion(id, dateStr, newStatus);
+        } else {
+            // Update local storage
+            const updated = habits.map(h => h.id === id ? { ...h, isCompleted: newStatus } : h);
+            localStorage.setItem("localHabits", JSON.stringify(updated));
+        }
     };
 
-    const addHabit = (habit: any) => {
-        setHabits((prev) => [...prev, habit]);
+    const addHabit = async (habitData: { name: string, color: string }) => {
+        if (user) {
+            console.log("Adding habit for authenticated user...");
+            const result = await addHabitAction(habitData.name, habitData.color);
+            console.log("Add habit result:", result);
+
+            if (!result.success) {
+                alert(`Failed to add habit: ${result.error || "Unknown error"}`);
+                return;
+            }
+
+            const dateStr = format(selectedDate, "yyyy-MM-dd");
+            const updatedHabits = await getHabits(dateStr);
+            console.log("Fetched updated habits:", updatedHabits);
+            setHabits(updatedHabits);
+        } else {
+            console.log("Adding habit for guest...");
+            if (habits.length >= 1) {
+                openSignIn();
+                return;
+            }
+            const newHabit = {
+                id: Date.now().toString(),
+                name: habitData.name,
+                color: habitData.color,
+                icon: "Circle",
+                isCompleted: false
+            };
+            const updated = [...habits, newHabit];
+            setHabits(updated);
+            localStorage.setItem("localHabits", JSON.stringify(updated));
+        }
     };
 
     const nextDay = () => setSelectedDate(prev => addDays(prev, 1));
@@ -37,18 +127,24 @@ export default function HabitList() {
 
     return (
         <div className="max-w-2xl mx-auto py-8 px-4">
+
+
+
             <header className="flex items-center justify-between mb-12">
                 <div>
                     <h1 className="text-3xl font-bold text-foreground font-display tracking-tight">FlowHabit</h1>
                     <p className="text-muted-foreground text-sm">One loop at a time.</p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-foreground text-background dark:bg-accent dark:text-accent-foreground rounded-2xl font-semibold shadow-lg hover:scale-105 active:scale-95 transition-all"
-                >
-                    <Plus className="w-5 h-5" />
-                    <span>New Habit</span>
-                </button>
+                <div className="flex items-center gap-4">
+                    <UserButton afterSignOutUrl="/" />
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-foreground text-background dark:bg-accent dark:text-accent-foreground rounded-2xl font-semibold shadow-lg hover:scale-105 active:scale-95 transition-all"
+                    >
+                        <Plus className="w-5 h-5" />
+                        <span>New Habit</span>
+                    </button>
+                </div>
             </header>
 
             <section className="bg-card border border-border rounded-3xl p-6 mb-8 shadow-sm">
@@ -114,7 +210,11 @@ export default function HabitList() {
 
             <div className="space-y-4">
                 <AnimatePresence mode="popLayout">
-                    {habits.length > 0 ? (
+                    {isLoading ? (
+                        [1, 2, 3].map((i) => (
+                            <div key={i} className="h-24 bg-card border border-border rounded-2xl animate-pulse shadow-sm" />
+                        ))
+                    ) : habits.length > 0 ? (
                         habits.map((habit) => (
                             <HabitCard
                                 key={habit.id}

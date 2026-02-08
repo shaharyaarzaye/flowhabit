@@ -20,10 +20,8 @@ export default function AddHabitModal({ isOpen, onClose, onAdd }: AddHabitModalP
         e.preventDefault();
         if (!name.trim()) return;
         onAdd({
-            id: Math.random().toString(36).substr(2, 9),
             name,
             color: selectedColor,
-            isCompleted: false,
         });
         setName("");
         onClose();
