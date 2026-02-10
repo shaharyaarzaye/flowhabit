@@ -6,6 +6,9 @@ export const habits = pgTable("habits", {
     description: text("description"),
     icon: text("icon").default("Circle"),
     color: text("color").default("#3b82f6"), // blue-500
+    type: text("type").default("boolean").notNull(), // 'boolean' or 'quantitative'
+    goalValue: integer("goal_value"),
+    unit: text("unit"),
     frequency: jsonb("frequency").default({ type: "daily", days: [] }),
     userId: text("user_id").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -17,5 +20,6 @@ export const completions = pgTable("completions", {
     habitId: uuid("habit_id").references(() => habits.id, { onDelete: "cascade" }).notNull(),
     date: text("date").notNull(), // YYYY-MM-DD
     completed: boolean("completed").default(true).notNull(),
+    value: integer("value"), // Numeric value for quantitative habits
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });

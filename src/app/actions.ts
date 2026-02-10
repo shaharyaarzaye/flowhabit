@@ -41,7 +41,7 @@ export async function getHabits(dateStr?: string) {
 
     const habitsWithHistory = await Promise.all(allHabits.map(async (habit) => {
       const historyResults = await db
-        .select({ date: completions.date })
+        .select({ date: completions.date, value: completions.value })
         .from(completions)
         .where(
           and(
@@ -52,9 +52,14 @@ export async function getHabits(dateStr?: string) {
 
       const completedDatesList = historyResults.map(h => h.date);
       const completedSet = new Set(completedDatesList);
-      const recentHistory: Record<string, boolean> = {};
+
+      const recentHistory: Record<string, { completed: boolean, value: number | null }> = {};
       dates.forEach(date => {
-        recentHistory[date] = completedSet.has(date);
+        const found = historyResults.find(h => h.date === date);
+        recentHistory[date] = {
+          completed: !!found,
+          value: found ? found.value : null
+        };
       });
 
       // Calculate simple Score (last 30 days) for the list view
@@ -83,25 +88,25 @@ export async function getHabits(dateStr?: string) {
   }
 }
 
-export async function addHabit(name: string, color: string) {
+export async function addHabit(name: string, color: string, description?: string, type: string = "boolean", goalValue?: number, unit?: string) {
   try {
     const authObj = await auth();
-    console.log("AddHabit Auth Object:", JSON.stringify(authObj, null, 2));
     const { userId } = authObj;
-    console.log("Adding habit for user:", userId);
 
     if (!userId) {
-      console.error("AddHabit: User not authenticated");
-      return { success: false, error: "Unauthorized: No User ID found in session" };
+      return { success: false, error: "Unauthorized" };
     }
 
     const result = await db.insert(habits).values({
       name,
       color,
+      description,
+      type,
+      goalValue,
+      unit,
       userId,
     }).returning();
 
-    console.log("Habit added successfully:", result);
     revalidatePath("/");
     return { success: true, data: result };
   } catch (error) {
@@ -110,13 +115,12 @@ export async function addHabit(name: string, color: string) {
   }
 }
 
-export async function toggleHabitCompletion(habitId: string, dateStr: string, isCompleted: boolean) {
+export async function toggleHabitCompletion(habitId: string, dateStr: string, isCompleted: boolean, value?: number) {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
     if (isCompleted) {
-      // First delete any existing completion to avoid duplicates if no unique constraint exists
       await db
         .delete(completions)
         .where(
@@ -130,6 +134,7 @@ export async function toggleHabitCompletion(habitId: string, dateStr: string, is
         habitId,
         date: dateStr,
         completed: true,
+        value: value || null,
       });
     } else {
       await db
@@ -166,13 +171,21 @@ export async function deleteHabit(id: string) {
   }
 }
 
-export async function updateHabit(id: string, name: string, color: string) {
+export async function updateHabit(id: string, name: string, color: string, description?: string, type?: string, goalValue?: number, unit?: string) {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
     await db.update(habits)
-      .set({ name, color, updatedAt: new Date() })
+      .set({
+        name,
+        color,
+        description,
+        type,
+        goalValue,
+        unit,
+        updatedAt: new Date()
+      })
       .where(and(eq(habits.id, id), eq(habits.userId, userId)));
 
     revalidatePath("/");
@@ -277,26 +290,49 @@ export async function getHabitDetails(id: string) {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     let currentMonthCount = 0;
 
+    // Previous Month Score for Delta
+    const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+    const prevMonth = prevMonthDate.getMonth();
+    const prevMonthYear = prevMonthDate.getFullYear();
+    const daysInPrevMonth = new Date(prevMonthYear, prevMonth + 1, 0).getDate();
+    let prevMonthCount = 0;
+
     dates.forEach(d => {
       const date = parseISO(d);
       if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
         currentMonthCount++;
       }
+      if (date.getMonth() === prevMonth && date.getFullYear() === prevMonthYear) {
+        prevMonthCount++;
+      }
     });
     const monthScore = Math.round((currentMonthCount / daysInMonth) * 100);
+    const prevMonthScore = Math.round((prevMonthCount / daysInPrevMonth) * 100);
+    const monthDelta = monthScore - prevMonthScore;
 
     // 3c. Year Score (Current Year)
     const startOfYear = new Date(currentYear, 0, 1);
     const dayOfYear = differenceInDays(today, startOfYear) + 1;
     let currentYearCount = 0;
 
+    // Previous Year Score for Delta
+    const prevYear = currentYear - 1;
+    const isLeapYear = (y: number) => (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+    const daysInPrevYear = isLeapYear(prevYear) ? 366 : 365;
+    let prevYearCount = 0;
+
     dates.forEach(d => {
       const date = parseISO(d);
       if (date.getFullYear() === currentYear) {
         currentYearCount++;
       }
+      if (date.getFullYear() === prevYear) {
+        prevYearCount++;
+      }
     });
     const yearScore = Math.round((currentYearCount / dayOfYear) * 100);
+    const prevYearScore = Math.round((prevYearCount / daysInPrevYear) * 100);
+    const yearDelta = yearScore - prevYearScore;
 
     // 4. Frequency (Day of week distribution)
     const frequencyMap = new Array(7).fill(0); // 0=Sun, 6=Sat
@@ -318,20 +354,19 @@ export async function getHabitDetails(id: string) {
 
     // 6. Rolling Score History (Approximation for Ogive Curve)
     // We want a daily series of the "Score" (last 30 days rolling average)
-    // Let's generate data for the last 30 days.
+    // Let's generate data for the last 365 days or all time? 
+    // The user wants filtering. Let's provide more data so client can filter.
     const rollingScoreHistory = [];
-    for (let i = 29; i >= 0; i--) {
+    const daysToGenerate = 365; // Cover a full year for the "Year" filter
+    for (let i = daysToGenerate - 1; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dStr = format(d, "MMM dd");
 
-      // Calculate score for this specific day in the past
-      // Score = completions in the 30 days ending on 'd'
       let windowCompletions = 0;
       const windowStart = new Date(d);
-      windowStart.setDate(windowStart.getDate() - 29); // 30 day window including 'd'
+      windowStart.setDate(windowStart.getDate() - 29); // 30 day window
 
-      // Filter completions that fall in [windowStart, d]
       dates.forEach(completionDateStr => {
         const completionDate = parseISO(completionDateStr);
         if (completionDate >= windowStart && completionDate <= d) {
@@ -344,6 +379,11 @@ export async function getHabitDetails(id: string) {
     }
 
 
+    // 7. Success Rate
+    const earliestLog = dates.length > 0 ? parseISO(dates.sort((a, b) => a.localeCompare(b))[0]) : today;
+    const daysActive = Math.max(1, differenceInDays(today, earliestLog) + 1);
+    const successRate = Math.round((dates.length / daysActive) * 100);
+
     return {
       ...habit[0],
       logs: dates, // Already sorted ascending
@@ -354,14 +394,17 @@ export async function getHabitDetails(id: string) {
       // New Stats
       score,
       monthScore,
+      monthDelta,
       yearScore,
+      yearDelta,
       bestStreaks,
       frequencyStats: frequencyMap, // [Sun, Mon, ..., Sat] counts
       historyStats: historyData, // [{name: "Jan", total: 5}, ...]
-      rollingScoreHistory // [{name: "Jan 01", score: 80}, ...]
+      rollingScoreHistory, // [{name: "Jan 01", score: 80}, ...]
+      successRate
     };
   } catch (error) {
-    console.error("Failed to get habit details:", error);
+    console.error("Error in getHabitDetails:", error);
     return null;
   }
 }

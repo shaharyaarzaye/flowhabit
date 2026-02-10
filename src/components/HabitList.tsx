@@ -41,14 +41,14 @@ export default function HabitList() {
     });
 
     // Helper to calculate score client-side
-    const calculateScore = (history: Record<string, boolean>) => {
+    const calculateScore = (history: Record<string, { completed: boolean, value: number | null }>) => {
         const today = new Date();
         let count = 0;
         for (let i = 0; i < 30; i++) {
             const d = new Date(today);
             d.setDate(d.getDate() - i);
             const dStr = format(d, "yyyy-MM-dd");
-            if (history[dStr]) count++;
+            if (history[dStr]?.completed) count++;
         }
         return Math.round((count / 30) * 100);
     };
@@ -111,47 +111,42 @@ export default function HabitList() {
 
     const toggleHabit = async (habitId: string, date: Date) => {
         const dateStr = format(date, "yyyy-MM-dd");
+        const habit = habits.find(h => h.id === habitId);
+        if (!habit) return;
+
+        let targetValue: number | null = null;
+        let isCompleted = !habit.recentHistory?.[dateStr]?.completed;
+
+        if (habit.type === "quantitative" && isCompleted) {
+            const val = prompt(`Enter value for ${habit.unit || 'completion'} (Goal: ${habit.goalValue})`, habit.goalValue?.toString());
+            if (val === null) return; // Cancelled
+            targetValue = parseInt(val) || 0;
+        }
 
         // Optimistic update
         setHabits(prev => prev.map(h => {
             if (h.id === habitId) {
-                const currentStatus = h.recentHistory?.[dateStr] || false;
-                const newHistory = { ...h.recentHistory, [dateStr]: !currentStatus };
-                // Recalculate score for immediate UI update (works for both but critical for guest)
+                const newHistory = {
+                    ...h.recentHistory,
+                    [dateStr]: { completed: isCompleted, value: targetValue }
+                };
                 const newScore = calculateScore(newHistory);
                 return { ...h, recentHistory: newHistory, score: newScore };
             }
             return h;
         }));
 
-        const habit = habits.find(h => h.id === habitId);
-        const isCompleted = !habit?.recentHistory?.[dateStr]; // Target state
-
         if (user) {
-            await toggleHabitCompletion(habitId, dateStr, isCompleted);
-            // We could refetch to be safe, but optimistic update handles the score visual for now.
-            // If the server calculation differs slightly, it will correct on next load.
+            await toggleHabitCompletion(habitId, dateStr, isCompleted, targetValue || undefined);
         } else {
             // Local storage update
-            const updated = habits.map(h => {
-                if (h.id === habitId) {
-                    const currentStatus = h.recentHistory?.[dateStr] || false;
-                    const newHistory = { ...h.recentHistory, [dateStr]: !currentStatus };
-                    const newScore = calculateScore(newHistory);
-                    return { ...h, recentHistory: newHistory, score: newScore };
-                }
-                return h;
-            });
-            // State is already updated via optimistic update above, but we need to ensure clarity
-            // Actually the optimistic update above uses 'prev', so 'habits' here might be stale if strict mode.
-            // Let's use functional update or rely on the fact that we just set it?
-            // Safer to just re-derive 'updated' from 'habits' state? No, 'habits' is stale in this closure.
-            // Best pattern:
             setHabits(prev => {
                 const newHabits = prev.map(h => {
                     if (h.id === habitId) {
-                        const currentStatus = h.recentHistory?.[dateStr] || false;
-                        const newHistory = { ...h.recentHistory, [dateStr]: !currentStatus };
+                        const newHistory = {
+                            ...h.recentHistory,
+                            [dateStr]: { completed: isCompleted, value: targetValue }
+                        };
                         const newScore = calculateScore(newHistory);
                         return { ...h, recentHistory: newHistory, score: newScore };
                     }
@@ -163,24 +158,36 @@ export default function HabitList() {
         }
     };
 
-    const addHabit = async (habitData: { name: string, color: string }) => {
+    const addHabit = async (habitData: {
+        name: string,
+        color: string,
+        description?: string,
+        type?: string,
+        goalValue?: number,
+        unit?: string
+    }) => {
         if (user) {
-            const result = await addHabitAction(habitData.name, habitData.color);
+            const result = await addHabitAction(
+                habitData.name,
+                habitData.color,
+                habitData.description,
+                habitData.type,
+                habitData.goalValue,
+                habitData.unit
+            );
             if (!result.success) {
                 alert(`Failed to add habit: ${result.error || "Unknown error"}`);
                 return;
             }
             fetchHabits();
         } else {
-            console.log("Adding habit for guest...");
-            if (habits.length >= 1) {
+            if (habits.length >= 2) { // Slightly more for guest now
                 openSignIn();
                 return;
             }
             const newHabit = {
                 id: Date.now().toString(),
-                name: habitData.name,
-                color: habitData.color,
+                ...habitData,
                 icon: "Circle",
                 recentHistory: {},
                 score: 0
@@ -316,15 +323,26 @@ export default function HabitList() {
                                         </div>
 
                                         <div className="flex-1 min-w-0">
-                                            <Link href={`/habits/${habit.id}`} className="truncate text-xs sm:text-sm font-bold hover:underline decoration-muted-foreground/50 underline-offset-4 decoration-2 block leading-tight">
+                                            <Link href={`/habits/${habit.id}`} className="truncate text-xs sm:text-sm font-bold hover:underline decoration-muted-foreground/50 underline-offset-4 decoration-2 block leading-snug">
                                                 {habit.name}
                                             </Link>
+                                            {habit.description && (
+                                                <p className="text-[9px] sm:text-[10px] text-muted-foreground truncate opacity-70">
+                                                    {habit.description}
+                                                </p>
+                                            )}
+                                            {habit.type === "quantitative" && (
+                                                <p className="text-[8px] sm:text-[9px] font-bold text-muted-foreground/50 uppercase tracking-tighter">
+                                                    Goal: {habit.goalValue} {habit.unit}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
                                     {dates.map((date, i) => {
                                         const dateStr = format(date, "yyyy-MM-dd");
-                                        const isCompleted = habit.recentHistory?.[dateStr];
+                                        const entry = habit.recentHistory?.[dateStr];
+                                        const isCompleted = entry?.completed;
                                         // Hide first 2 days on mobile (indices 0 and 1)
                                         const hiddenClass = i < 2 ? "hidden sm:flex" : "flex";
 
@@ -333,7 +351,7 @@ export default function HabitList() {
                                                 <button
                                                     onClick={() => toggleHabit(habit.id, date)}
                                                     className={`
-                                                        w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-300
+                                                        relative w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-300
                                                         ${isCompleted
                                                             ? "text-white shadow-sm scale-100"
                                                             : "bg-muted/30 border-2 border-transparent hover:border-muted-foreground/20 scale-90 hover:scale-100"
@@ -341,7 +359,20 @@ export default function HabitList() {
                                                     `}
                                                     style={isCompleted ? { backgroundColor: habit.color } : {}}
                                                 >
-                                                    {isCompleted && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" strokeWidth={3} />}
+                                                    {isCompleted ? (
+                                                        habit.type === "quantitative" ? (
+                                                            <span className="text-[8px] sm:text-[10px] font-black">
+                                                                {entry.value}
+                                                            </span>
+                                                        ) : (
+                                                            <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" strokeWidth={3} />
+                                                        )
+                                                    ) : null}
+                                                    {habit.type === "quantitative" && !isCompleted && (
+                                                        <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-card border border-border rounded-full flex items-center justify-center">
+                                                            <span className="text-[6px] font-black opacity-40">#</span>
+                                                        </span>
+                                                    )}
                                                 </button>
                                             </div>
                                         );

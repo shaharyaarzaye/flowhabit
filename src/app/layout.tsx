@@ -20,8 +20,7 @@ export const metadata: Metadata = {
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
 
-// ... existing imports ...
-
+// Final Root Layout
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -32,6 +31,7 @@ export default function RootLayout({
       <html lang="en" suppressHydrationWarning>
         <body
           className={`${inter.variable} ${outfit.variable} antialiased`}
+          suppressHydrationWarning
         >
           <ThemeProvider
             attribute="class"
