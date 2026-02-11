@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { habits, completions } from "@/db/schema";
+import { habits, completions, purchases } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { differenceInDays, parseISO, format } from "date-fns";
@@ -85,6 +85,46 @@ export async function getHabits(dateStr?: string) {
   } catch (error) {
     console.error("Failed to fetch habits:", error);
     return [];
+  }
+}
+
+export async function checkPremiumStatus() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return { isPremium: false };
+
+    const result = await db
+      .select()
+      .from(purchases)
+      .where(
+        and(
+          eq(purchases.userId, userId),
+          eq(purchases.status, "paid")
+        )
+      )
+      .limit(1);
+
+    return { isPremium: result.length > 0 };
+  } catch (error) {
+    console.error("Error checking premium status:", error);
+    return { isPremium: false };
+  }
+}
+
+export async function getHabitCount() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return 0;
+
+    const allHabits = await db
+      .select()
+      .from(habits)
+      .where(eq(habits.userId, userId));
+
+    return allHabits.length;
+  } catch (error) {
+    console.error("Error getting habit count:", error);
+    return 0;
   }
 }
 

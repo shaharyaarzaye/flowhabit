@@ -15,6 +15,19 @@ export const habits = pgTable("habits", {
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const purchases = pgTable("purchases", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull(),
+    razorpayOrderId: text("razorpay_order_id").notNull(),
+    razorpayPaymentId: text("razorpay_payment_id"),
+    razorpaySignature: text("razorpay_signature"),
+    amount: integer("amount").notNull(), // in paise
+    currency: text("currency").default("INR").notNull(),
+    status: text("status").default("created").notNull(), // 'created', 'paid', 'failed'
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const completions = pgTable("completions", {
     id: uuid("id").primaryKey().defaultRandom(),
     habitId: uuid("habit_id").references(() => habits.id, { onDelete: "cascade" }).notNull(),

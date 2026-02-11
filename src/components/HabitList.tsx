@@ -1,25 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Check, MoreVertical, Edit2, Trash2, X } from "lucide-react";
+import { Plus, Check, MoreVertical, Edit2, Trash2, X, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import AddHabitModal from "./AddHabitModal";
+import UpgradeModal from "./UpgradeModal";
 import { format, subDays } from "date-fns";
-import { getHabits, addHabit as addHabitAction, toggleHabitCompletion, deleteHabit, updateHabit } from "@/app/actions";
+import { getHabits, addHabit as addHabitAction, toggleHabitCompletion, deleteHabit, updateHabit, checkPremiumStatus } from "@/app/actions";
 import { useUser, useClerk, UserButton, SignInButton, SignedOut, SignedIn } from "@clerk/nextjs";
 import { syncLocalHabits } from "@/app/syncActions";
 import Link from "next/link";
 import { ThemeToggle } from "./ThemeToggle";
+
+const FREE_HABIT_LIMIT = 4;
 
 export default function HabitList() {
     const { user, isLoaded } = useUser();
     const { openSignIn } = useClerk();
     const [habits, setHabits] = useState<any[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [editingHabit, setEditingHabit] = useState<string | null>(null);
     const [editName, setEditName] = useState("");
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const [isPremium, setIsPremium] = useState(false);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -95,12 +100,20 @@ export default function HabitList() {
     }, [isLoaded, user]);
 
 
+    const fetchPremiumStatus = async () => {
+        if (user) {
+            const status = await checkPremiumStatus();
+            setIsPremium(status.isPremium);
+        }
+    };
+
     const fetchHabits = async () => {
         setIsLoading(true);
         try {
             if (user) {
                 const data = await getHabits(); // Returns habits with history
                 setHabits(data);
+                fetchPremiumStatus();
             }
         } catch (error) {
             console.error("Error fetching habits:", error);
@@ -158,6 +171,30 @@ export default function HabitList() {
         }
     };
 
+    const handleNewHabitClick = () => {
+        if (user) {
+            // Check if free user has reached the limit
+            if (!isPremium && habits.length >= FREE_HABIT_LIMIT) {
+                setIsUpgradeModalOpen(true);
+                return;
+            }
+            setIsModalOpen(true);
+        } else {
+            if (habits.length >= 2) {
+                openSignIn();
+                return;
+            }
+            setIsModalOpen(true);
+        }
+    };
+
+    const handleUpgradeSuccess = () => {
+        setIsPremium(true);
+        setIsUpgradeModalOpen(false);
+        // Open the add habit modal after upgrade
+        setIsModalOpen(true);
+    };
+
     const addHabit = async (habitData: {
         name: string,
         color: string,
@@ -181,7 +218,7 @@ export default function HabitList() {
             }
             fetchHabits();
         } else {
-            if (habits.length >= 2) { // Slightly more for guest now
+            if (habits.length >= 2) {
                 openSignIn();
                 return;
             }
@@ -240,7 +277,15 @@ export default function HabitList() {
                 <div className="flex items-center gap-1 sm:gap-3">
                     <ThemeToggle />
                     <SignedIn>
-                        <UserButton afterSignOutUrl="/" />
+                        <div className="flex items-center gap-1.5">
+                            {isPremium && (
+                                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-full text-[9px] font-bold text-indigo-500 uppercase tracking-wider">
+                                    <Zap className="w-2.5 h-2.5" fill="currentColor" />
+                                    Pro
+                                </span>
+                            )}
+                            <UserButton afterSignOutUrl="/" />
+                        </div>
                     </SignedIn>
                     <SignedOut>
                         <SignInButton mode="modal">
@@ -250,7 +295,7 @@ export default function HabitList() {
                         </SignInButton>
                     </SignedOut>
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={handleNewHabitClick}
                         className="flex items-center gap-1 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-foreground text-background dark:bg-accent dark:text-accent-foreground rounded-lg sm:rounded-xl font-semibold shadow hover:shadow-lg hover:scale-105 active:scale-95 transition-all text-[10px] sm:text-sm"
                     >
                         <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -475,10 +520,34 @@ export default function HabitList() {
                 </AnimatePresence>
             </div>
 
+            {/* Free tier indicator */}
+            {user && !isPremium && !isLoading && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
+                    <button
+                        onClick={() => setIsUpgradeModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-full shadow-lg hover:shadow-xl transition-all text-xs"
+                    >
+                        <span className="text-muted-foreground">
+                            {habits.length}/{FREE_HABIT_LIMIT} habits used
+                        </span>
+                        <span className="flex items-center gap-1 text-indigo-500 font-bold">
+                            <Zap className="w-3 h-3" fill="currentColor" />
+                            Upgrade
+                        </span>
+                    </button>
+                </div>
+            )}
+
             <AddHabitModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onAdd={addHabit}
+            />
+
+            <UpgradeModal
+                isOpen={isUpgradeModalOpen}
+                onClose={() => setIsUpgradeModalOpen(false)}
+                onUpgradeSuccess={handleUpgradeSuccess}
             />
         </div>
     );
