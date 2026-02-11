@@ -1,9 +1,5 @@
-import HabitList from "@/components/HabitList";
+import LandingPage from "./(landing)/page";
 
 export default function Home() {
-  return (
-    <main className="min-h-screen">
-      <HabitList />
-    </main>
-  );
+  return <LandingPage />;
 }
