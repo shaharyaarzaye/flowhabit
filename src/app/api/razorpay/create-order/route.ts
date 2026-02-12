@@ -9,7 +9,7 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET!,
 });
 
-const UPGRADE_AMOUNT = 4900; // ₹49 in paise — adjust as needed
+const UPGRADE_AMOUNT = 9900; // ₹99 in paise
 
 export async function POST(req: NextRequest) {
     try {
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
         const order = await razorpay.orders.create({
             amount: UPGRADE_AMOUNT,
             currency: "INR",
-            receipt: `flowhabit_pro_${userId}_${Date.now()}`,
+            receipt: `fh_pro_${userId.slice(-8)}_${Date.now()}`,
             notes: {
                 userId,
                 purpose: "FlowHabit Pro Upgrade",

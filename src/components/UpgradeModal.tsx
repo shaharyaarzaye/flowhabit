@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Zap, Infinity as InfinityIcon, TrendingUp, BarChart3, Shield, Sparkles } from "lucide-react";
+import { X, Zap, Infinity as InfinityIcon, TrendingUp, BarChart3, Shield, Sparkles, Check } from "lucide-react";
 
 interface UpgradeModalProps {
     isOpen: boolean;
     onClose: () => void;
     onUpgradeSuccess: () => void;
+    hitLimit?: boolean;
 }
 
 declare global {
@@ -17,13 +18,13 @@ declare global {
 }
 
 const FEATURES = [
-    { icon: InfinityIcon, label: "Unlimited Habits", description: "Track as many habits as you want" },
-    { icon: TrendingUp, label: "Advanced Analytics", description: "Deep insights into your progress" },
-    { icon: BarChart3, label: "Detailed Reports", description: "Monthly & yearly performance stats" },
-    { icon: Shield, label: "Priority Support", description: "Get help when you need it" },
+    { icon: InfinityIcon, label: "Unlimited Habits" },
+    { icon: TrendingUp, label: "Advanced Analytics" },
+    { icon: BarChart3, label: "Detailed Reports" },
+    { icon: Shield, label: "Priority Support" },
 ];
 
-export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess }: UpgradeModalProps) {
+export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess, hitLimit = false }: UpgradeModalProps) {
     const [isProcessing, setIsProcessing] = useState(false);
 
     const loadRazorpayScript = (): Promise<boolean> => {
@@ -44,7 +45,6 @@ export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess }: Upgr
         setIsProcessing(true);
 
         try {
-            // Load Razorpay script
             const loaded = await loadRazorpayScript();
             if (!loaded) {
                 alert("Failed to load payment gateway. Please try again.");
@@ -52,7 +52,6 @@ export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess }: Upgr
                 return;
             }
 
-            // Create order
             const res = await fetch("/api/razorpay/create-order", {
                 method: "POST",
             });
@@ -63,7 +62,6 @@ export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess }: Upgr
 
             const orderData = await res.json();
 
-            // Open Razorpay checkout
             const options = {
                 key: orderData.keyId,
                 amount: orderData.amount,
@@ -72,7 +70,6 @@ export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess }: Upgr
                 description: "FlowHabit Pro — Lifetime Access",
                 order_id: orderData.orderId,
                 handler: async function (response: any) {
-                    // Verify payment on server
                     try {
                         const verifyRes = await fetch("/api/razorpay/verify-payment", {
                             method: "POST",
@@ -124,94 +121,104 @@ export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess }: Upgr
         <AnimatePresence>
             {isOpen && (
                 <>
+                    {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/50 backdrop-blur-md z-50"
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
                     />
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm z-50"
-                    >
-                        <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-2xl">
-                            {/* Gradient Background Decoration */}
-                            <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-indigo-500/10 via-purple-500/5 to-transparent pointer-events-none" />
-                            <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-                            <div className="absolute -top-10 -left-10 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-                            {/* Close */}
+                    {/* Modal — bottom sheet on mobile, centered on desktop */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 100 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 100 }}
+                        transition={{ type: "spring", damping: 30, stiffness: 350 }}
+                        className="fixed inset-x-0 bottom-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 w-full sm:max-w-[380px] z-50"
+                    >
+                        <div className="relative overflow-hidden rounded-t-3xl sm:rounded-3xl bg-card border border-border/80 shadow-2xl">
+                            {/* Decorative gradients */}
+                            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-indigo-500/8 via-purple-500/4 to-transparent pointer-events-none" />
+                            <div className="absolute -top-16 -right-16 w-32 h-32 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+                            <div className="absolute -top-8 -left-8 w-24 h-24 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                            {/* Drag handle — mobile only */}
+                            <div className="sm:hidden flex justify-center pt-3 pb-1">
+                                <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
+                            </div>
+
+                            {/* Close button */}
                             <button
                                 onClick={onClose}
-                                className="absolute top-4 right-4 p-1.5 hover:bg-muted rounded-full transition-colors z-10"
+                                className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1.5 hover:bg-muted rounded-full transition-colors z-10"
                             >
                                 <X className="w-4 h-4 text-muted-foreground" />
                             </button>
 
                             {/* Content */}
-                            <div className="relative p-6 pt-8">
-                                {/* Badge */}
-                                <div className="flex justify-center mb-4">
+                            <div className="relative px-5 pb-6 pt-4 sm:p-6 sm:pt-7">
+                                {/* Glowing badge */}
+                                <div className="flex justify-center mb-3">
                                     <motion.div
-                                        animate={{ rotate: [0, -5, 5, -5, 0] }}
-                                        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                                        className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25"
+                                        animate={{ scale: [1, 1.05, 1] }}
+                                        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                                        className="relative"
                                     >
-                                        <Zap className="w-8 h-8 text-white" fill="white" />
+                                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 blur-lg opacity-40" />
+                                        <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                                            <Zap className="w-7 h-7 text-white" fill="white" />
+                                        </div>
                                     </motion.div>
                                 </div>
 
                                 {/* Title */}
-                                <div className="text-center mb-6">
-                                    <h2 className="text-xl font-bold text-foreground mb-1 flex items-center justify-center gap-2">
+                                <div className="text-center mb-4">
+                                    <h2 className="text-lg font-bold text-foreground flex items-center justify-center gap-1.5">
                                         Upgrade to
                                         <span className="bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
                                             Pro
                                         </span>
                                         <Sparkles className="w-4 h-4 text-amber-400" />
                                     </h2>
-                                    <p className="text-muted-foreground text-sm">
-                                        You&apos;ve reached the free limit of <strong>4 habits</strong>. Unlock unlimited tracking!
+                                    <p className="text-muted-foreground text-xs mt-1 leading-relaxed">
+                                        {hitLimit
+                                            ? <>You&apos;ve reached the free limit of <strong>4 habits</strong>. Upgrade to unlock unlimited tracking!</>
+                                            : "Go Pro and unlock unlimited habits, analytics, and more."
+                                        }
                                     </p>
                                 </div>
 
-                                {/* Features */}
-                                <div className="space-y-3 mb-6">
+                                {/* Features — compact 2x2 grid */}
+                                <div className="grid grid-cols-2 gap-2 mb-5">
                                     {FEATURES.map((feature, i) => (
                                         <motion.div
                                             key={i}
-                                            initial={{ opacity: 0, x: -20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ delay: 0.1 * i }}
-                                            className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/40 border border-border/50"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.05 * i + 0.1 }}
+                                            className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/50 border border-border/40"
                                         >
-                                            <div
-                                                className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/15 to-purple-500/15 flex items-center justify-center shrink-0"
-                                            >
-                                                <feature.icon className="w-4 h-4 text-indigo-500" />
+                                            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500/15 to-purple-500/15 flex items-center justify-center shrink-0">
+                                                <feature.icon className="w-3.5 h-3.5 text-indigo-500" />
                                             </div>
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-foreground">{feature.label}</p>
-                                                <p className="text-[10px] text-muted-foreground leading-tight">{feature.description}</p>
-                                            </div>
+                                            <p className="text-[11px] font-semibold text-foreground leading-tight">{feature.label}</p>
                                         </motion.div>
                                     ))}
                                 </div>
 
-                                {/* Price */}
-                                <div className="text-center mb-4">
-                                    <div className="flex items-baseline justify-center gap-1">
+                                {/* Price section */}
+                                <div className="text-center mb-4 py-3 rounded-2xl bg-gradient-to-r from-indigo-500/[0.06] to-purple-500/[0.06] border border-indigo-500/10">
+                                    <div className="flex items-baseline justify-center gap-1.5">
+                                        <span className="text-sm text-muted-foreground line-through">₹199</span>
                                         <span className="text-3xl font-black bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
-                                            ₹49
+                                            ₹99
                                         </span>
-                                        <span className="text-muted-foreground text-xs font-medium">one-time</span>
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                                        Lifetime access • No subscriptions
+                                    <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                                        One-time payment • Lifetime access
                                     </p>
                                 </div>
 
@@ -219,7 +226,7 @@ export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess }: Upgr
                                 <button
                                     onClick={handleUpgrade}
                                     disabled={isProcessing}
-                                    className="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {isProcessing ? (
                                         <>
@@ -232,12 +239,13 @@ export default function UpgradeModal({ isOpen, onClose, onUpgradeSuccess }: Upgr
                                         </>
                                     ) : (
                                         <>
-                                            <Zap className="w-4 h-4" />
-                                            Upgrade Now
+                                            <Zap className="w-4 h-4" fill="currentColor" />
+                                            Upgrade Now — ₹99
                                         </>
                                     )}
                                 </button>
 
+                                {/* Trust badge */}
                                 <p className="text-center text-[10px] text-muted-foreground mt-3 flex items-center justify-center gap-1">
                                     <Shield className="w-3 h-3" />
                                     Secured by Razorpay • 100% Safe

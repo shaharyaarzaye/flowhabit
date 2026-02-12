@@ -147,8 +147,8 @@ function HabitMockup() {
                             <motion.div
                                 key={day + i}
                                 className={`flex flex-col items-center gap-1 px-2 py-1.5 rounded-xl text-[10px] font-medium transition-all ${i === 3
-                                        ? "bg-primary text-white shadow-lg shadow-primary/30"
-                                        : "text-muted-foreground"
+                                    ? "bg-primary text-white shadow-lg shadow-primary/30"
+                                    : "text-muted-foreground"
                                     }`}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -439,8 +439,8 @@ export default function LandingPage() {
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg shadow-primary/25 group-hover:shadow-primary/40 transition-shadow">
                             <Zap className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-xl font-display font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                            FlowHabit
+                        <span className="text-xl font-display tracking-tight">
+                            <span className="font-medium bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Flow</span><span className="font-extrabold text-foreground">Habit</span>
                         </span>
                     </Link>
 
@@ -959,7 +959,7 @@ export default function LandingPage() {
                                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg shadow-primary/25">
                                     <Zap className="w-4 h-4 text-white" />
                                 </div>
-                                <span className="text-xl font-display font-bold">FlowHabit</span>
+                                <span className="text-xl font-display tracking-tight"><span className="font-medium bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Flow</span><span className="font-extrabold text-foreground">Habit</span></span>
                             </div>
                             <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
                                 The minimalist habit tracker designed to help you build consistency and transform your daily routines.

@@ -20,6 +20,7 @@ export default function HabitList() {
     const [habits, setHabits] = useState<any[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+    const [upgradeHitLimit, setUpgradeHitLimit] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [editingHabit, setEditingHabit] = useState<string | null>(null);
     const [editName, setEditName] = useState("");
@@ -175,6 +176,7 @@ export default function HabitList() {
         if (user) {
             // Check if free user has reached the limit
             if (!isPremium && habits.length >= FREE_HABIT_LIMIT) {
+                setUpgradeHitLimit(true);
                 setIsUpgradeModalOpen(true);
                 return;
             }
@@ -271,7 +273,9 @@ export default function HabitList() {
         <div className="max-w-3xl mx-auto py-8 px-2 sm:px-4 pb-32">
             <header className="flex items-center justify-between mb-8 px-2 sm:px-0">
                 <div>
-                    <h1 className="text-3xl font-bold text-foreground font-display tracking-tight">FlowHabit</h1>
+                    <h1 className="text-3xl font-display tracking-tight">
+                        <span className="font-medium bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Flow</span><span className="font-extrabold text-foreground">Habit</span>
+                    </h1>
                     <p className="text-muted-foreground text-sm">One loop at a time.</p>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-3">
@@ -524,7 +528,7 @@ export default function HabitList() {
             {user && !isPremium && !isLoading && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
                     <button
-                        onClick={() => setIsUpgradeModalOpen(true)}
+                        onClick={() => { setUpgradeHitLimit(false); setIsUpgradeModalOpen(true); }}
                         className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-full shadow-lg hover:shadow-xl transition-all text-xs"
                     >
                         <span className="text-muted-foreground">
@@ -548,6 +552,7 @@ export default function HabitList() {
                 isOpen={isUpgradeModalOpen}
                 onClose={() => setIsUpgradeModalOpen(false)}
                 onUpgradeSuccess={handleUpgradeSuccess}
+                hitLimit={upgradeHitLimit}
             />
         </div>
     );
