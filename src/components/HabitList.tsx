@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Check, MoreVertical, Edit2, Trash2, X, Zap } from "lucide-react";
+import { Plus, Check, MoreVertical, Edit2, Trash2, X, Zap, BarChart3 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import AddHabitModal from "./AddHabitModal";
 import UpgradeModal from "./UpgradeModal";
@@ -279,6 +279,13 @@ export default function HabitList() {
                     <p className="text-muted-foreground text-sm">One loop at a time.</p>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-3">
+                    <Link
+                        href="/statistics"
+                        className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
+                        title="Statistics"
+                    >
+                        <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </Link>
                     <ThemeToggle />
                     <SignedIn>
                         <div className="flex items-center gap-1.5">

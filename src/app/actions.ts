@@ -448,3 +448,258 @@ export async function getHabitDetails(id: string) {
     return null;
   }
 }
+
+export async function getStatistics() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return null;
+
+    const allHabits = await db
+      .select()
+      .from(habits)
+      .where(eq(habits.userId, userId))
+      .orderBy(desc(habits.createdAt));
+
+    if (allHabits.length === 0) {
+      return {
+        totalHabits: 0,
+        totalCompletions: 0,
+        overallScore: 0,
+        overallStreak: 0,
+        bestDay: "N/A",
+        worstDay: "N/A",
+        todayCompleted: 0,
+        todayTotal: 0,
+        weeklyActivity: [0, 0, 0, 0, 0, 0, 0],
+        habitBreakdowns: [],
+        monthlyTrend: [],
+        last30DaysDaily: [],
+        topHabit: null,
+        needsAttention: null,
+      };
+    }
+
+    const today = new Date();
+    const todayStr = format(today, "yyyy-MM-dd");
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Fetch all completions for all habits
+    const allCompletions = await Promise.all(
+      allHabits.map(async (habit) => {
+        const comps = await db
+          .select({ date: completions.date, value: completions.value })
+          .from(completions)
+          .where(
+            and(
+              eq(completions.habitId, habit.id),
+              eq(completions.completed, true)
+            )
+          );
+        return { habit, completions: comps };
+      })
+    );
+
+    let totalCompletions = 0;
+    let totalLast30 = 0;
+    const weeklyActivity = [0, 0, 0, 0, 0, 0, 0]; // Sun-Sat
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    let todayCompleted = 0;
+
+    // Monthly trend: last 6 months
+    const monthlyTrendMap: Record<string, { completions: number; possible: number }> = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const key = format(d, "MMM yyyy");
+      monthlyTrendMap[key] = { completions: 0, possible: 0 };
+    }
+
+    // Last 30 days daily completions
+    const last30Map: Record<string, number> = {};
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      last30Map[format(d, "yyyy-MM-dd")] = 0;
+    }
+
+    const habitBreakdowns: {
+      id: string;
+      name: string;
+      color: string;
+      type: string;
+      score: number;
+      streak: number;
+      totalCompletions: number;
+      monthDelta: number;
+    }[] = [];
+
+    allHabits.forEach((habit, idx) => {
+      const comps = allCompletions[idx].completions;
+      const dates = comps.map((c) => c.date).sort();
+      const completedSet = new Set(dates);
+
+      totalCompletions += dates.length;
+
+      // Today check
+      if (completedSet.has(todayStr)) {
+        todayCompleted++;
+      }
+
+      // Weekly distribution
+      dates.forEach((d) => {
+        const day = parseISO(d).getDay();
+        weeklyActivity[day]++;
+      });
+
+      // Last 30 days count
+      let last30Count = 0;
+      dates.forEach((d) => {
+        if (new Date(d) >= thirtyDaysAgo) {
+          last30Count++;
+        }
+        // Add to daily map
+        if (last30Map[d] !== undefined) {
+          last30Map[d]++;
+        }
+      });
+      totalLast30 += last30Count;
+
+      // Monthly trend
+      dates.forEach((d) => {
+        const dateObj = parseISO(d);
+        const key = format(dateObj, "MMM yyyy");
+        if (monthlyTrendMap[key]) {
+          monthlyTrendMap[key].completions++;
+        }
+      });
+
+      // Streak for this habit
+      let streak = 0;
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = format(yesterday, "yyyy-MM-dd");
+
+      if (completedSet.has(todayStr)) {
+        streak = 1;
+        let d = new Date(today);
+        d.setDate(d.getDate() - 1);
+        while (completedSet.has(format(d, "yyyy-MM-dd"))) {
+          streak++;
+          d.setDate(d.getDate() - 1);
+        }
+      } else if (completedSet.has(yesterdayStr)) {
+        streak = 1;
+        let d = new Date(yesterday);
+        d.setDate(d.getDate() - 1);
+        while (completedSet.has(format(d, "yyyy-MM-dd"))) {
+          streak++;
+          d.setDate(d.getDate() - 1);
+        }
+      }
+
+      const score = Math.min(100, Math.round((last30Count / 30) * 100));
+
+      // Month delta
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      let currentMonthCount = 0;
+
+      const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+      const prevMonth = prevMonthDate.getMonth();
+      const prevMonthYear = prevMonthDate.getFullYear();
+      const daysInPrevMonth = new Date(prevMonthYear, prevMonth + 1, 0).getDate();
+      let prevMonthCount = 0;
+
+      dates.forEach((d) => {
+        const date = parseISO(d);
+        if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+          currentMonthCount++;
+        }
+        if (date.getMonth() === prevMonth && date.getFullYear() === prevMonthYear) {
+          prevMonthCount++;
+        }
+      });
+      const monthScore = Math.round((currentMonthCount / daysInMonth) * 100);
+      const prevMonthScore = Math.round((prevMonthCount / daysInPrevMonth) * 100);
+      const monthDelta = monthScore - prevMonthScore;
+
+      habitBreakdowns.push({
+        id: habit.id,
+        name: habit.name,
+        color: habit.color || "#3b82f6",
+        type: habit.type || "boolean",
+        score,
+        streak,
+        totalCompletions: dates.length,
+        monthDelta,
+      });
+    });
+
+    // Calculate monthly trend with possible per-habit-per-day count
+    for (const key of Object.keys(monthlyTrendMap)) {
+      // Each habit contributes days in that month to "possible"
+      const parts = key.split(" ");
+      const monthIndex = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].indexOf(parts[0]);
+      const year = parseInt(parts[1]);
+      const daysInM = new Date(year, monthIndex + 1, 0).getDate();
+      monthlyTrendMap[key].possible = daysInM * allHabits.length;
+    }
+
+    const monthlyTrend = Object.entries(monthlyTrendMap).map(([name, data]) => ({
+      name: name.split(" ")[0], // Just month abbreviation
+      completions: data.completions,
+      rate: data.possible > 0 ? Math.round((data.completions / data.possible) * 100) : 0,
+    }));
+
+    // Last 30 days daily
+    const last30DaysDaily = Object.entries(last30Map).map(([date, count]) => ({
+      name: format(parseISO(date), "MMM dd"),
+      date,
+      completions: count,
+      rate: allHabits.length > 0 ? Math.round((count / allHabits.length) * 100) : 0,
+    }));
+
+    // Overall score
+    const overallScore = allHabits.length > 0
+      ? Math.round(totalLast30 / (30 * allHabits.length) * 100)
+      : 0;
+
+    // Best/Worst days
+    const maxActivity = Math.max(...weeklyActivity);
+    const minActivity = Math.min(...weeklyActivity);
+    const bestDay = dayNames[weeklyActivity.indexOf(maxActivity)];
+    const worstDay = dayNames[weeklyActivity.indexOf(minActivity)];
+
+    // Overall streak = avg of habits with active streaks
+    const activeStreaks = habitBreakdowns.filter((h) => h.streak > 0);
+    const overallStreak = activeStreaks.length > 0
+      ? Math.round(activeStreaks.reduce((sum, h) => sum + h.streak, 0) / activeStreaks.length)
+      : 0;
+
+    // Top habit (highest score)
+    const sorted = [...habitBreakdowns].sort((a, b) => b.score - a.score);
+    const topHabit = sorted.length > 0 ? sorted[0] : null;
+    const needsAttention = sorted.length > 0 ? sorted[sorted.length - 1] : null;
+
+    return {
+      totalHabits: allHabits.length,
+      totalCompletions,
+      overallScore: Math.min(100, overallScore),
+      overallStreak,
+      bestDay,
+      worstDay,
+      todayCompleted,
+      todayTotal: allHabits.length,
+      weeklyActivity,
+      habitBreakdowns,
+      monthlyTrend,
+      last30DaysDaily,
+      topHabit,
+      needsAttention: needsAttention && needsAttention.id !== topHabit?.id ? needsAttention : null,
+    };
+  } catch (error) {
+    console.error("Error getting statistics:", error);
+    return null;
+  }
+}
