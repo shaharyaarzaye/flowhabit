@@ -271,10 +271,12 @@ export default function HabitList() {
 
     return (
         <div className="max-w-3xl mx-auto py-8 px-2 sm:px-4 pb-32">
+
+            {/* Header */}
             <header className="flex items-center justify-between mb-8 px-2 sm:px-0">
                 <div>
                     <h1 className="text-3xl font-display tracking-tight">
-                        <span className="font-medium bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Flow</span><span className="font-extrabold text-foreground">Habit</span>
+                        <span className="font-extrabold bg-linear-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent ">Flow</span><span className="font-extrabold text-foreground">Habit</span>
                     </h1>
                     <p className="text-muted-foreground text-sm">One loop at a time.</p>
                 </div>
@@ -318,7 +320,7 @@ export default function HabitList() {
 
             {/* Grid Header */}
             <div className="grid grid-cols-[1fr_repeat(4,28px)_20px] sm:grid-cols-[1.5fr_repeat(6,minmax(36px,1fr))_36px] gap-1 sm:gap-1.5 mb-4 px-2 sm:px-4 sm:overflow-visible">
-                <div className="text-muted-foreground text-[10px] sm:text-xs font-medium uppercase tracking-wider self-end pb-2">Habit</div>
+                <div className="text-muted-foreground text-[10px] sm:text-xs font-medium  tracking-wider self-end pb-2">Habits</div>
                 {dates.map((date, i) => {
                     const hiddenClass = i < 2 ? "hidden sm:flex" : "flex";
                     return (
@@ -353,7 +355,7 @@ export default function HabitList() {
                                 <div className="grid grid-cols-[1fr_repeat(4,28px)_20px] sm:grid-cols-[1.5fr_repeat(6,minmax(36px,1fr))_36px] gap-1 sm:gap-1.5 p-2 sm:p-3 items-center relative z-10 bg-card">
                                     <div className="flex items-center gap-2 sm:gap-3 overflow-hidden pr-1 sm:pr-2">
                                         {/* Circular Score Indicator */}
-                                        <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0">
+                                        {/* <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0">
                                             <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                                                 <path
                                                     className="text-muted/20"
@@ -376,10 +378,10 @@ export default function HabitList() {
                                                     {habit.score}%
                                                 </span>
                                             </div>
-                                        </div>
+                                        </div> */}
 
                                         <div className="flex-1 min-w-0">
-                                            <Link href={`/habits/${habit.id}`} className="truncate text-xs sm:text-sm font-bold hover:underline decoration-muted-foreground/50 underline-offset-4 decoration-2 block leading-snug">
+                                            <Link href={`/habits/${habit.id}`} className="truncate text-xs sm:text-sm font-bold hover:underline decoration-muted-foreground/50 underline-offset-4 decoration-2 block pr-5 leading-snug">
                                                 {habit.name}
                                             </Link>
                                             {habit.description && (
