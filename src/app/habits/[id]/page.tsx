@@ -7,7 +7,7 @@ import {
     Calendar, Target, Lightbulb, ArrowUpRight, ArrowDownRight,
     Sparkles
 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { getHabitDetails, toggleHabitCompletion, deleteHabit, updateHabit } from "@/app/actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -178,6 +178,9 @@ export default function HabitDetailsPage() {
     // Today toggle
     const [toggling, setToggling] = useState(false);
 
+    // Calendar scroll ref — keep the heatmap scrolled to the current month/week on load
+    const calendarRef = useRef<HTMLDivElement | null>(null);
+
     const habitId = Array.isArray(params.id) ? params.id[0] : params.id;
 
     const fetchHabit = useCallback(async () => {
@@ -196,6 +199,16 @@ export default function HabitDetailsPage() {
     }, [habitId]);
 
     useEffect(() => { fetchHabit(); }, [fetchHabit]);
+
+    // After habit data renders, scroll the calendar heatmap to the right (current week/month)
+    useLayoutEffect(() => {
+        const el = calendarRef.current;
+        if (!el) return;
+        // Scroll to the rightmost side so current month is visible on load
+        requestAnimationFrame(() => {
+            el.scrollLeft = el.scrollWidth - el.clientWidth;
+        });
+    }, [habit]);
 
     const handleToggleToday = async () => {
         if (!habit || toggling) return;
@@ -665,8 +678,8 @@ export default function HabitDetailsPage() {
                         transition={{ delay: 0.45 }}
                         className="bg-card/30 border border-border/50 rounded-2xl p-5 overflow-hidden"
                     >
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Calendar</h2>
-                        <div className="overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
+                        <h2 className="text-sm font-bold uppercase tracking-wider  text-muted-foreground mb-4">Calendar</h2>
+                        <div ref={calendarRef} className="overflow-x-auto  pb-2 -mx-1 px-1">
                             <div className="inline-block min-w-full align-middle">
                                 {(() => {
                                     const today = new Date();
