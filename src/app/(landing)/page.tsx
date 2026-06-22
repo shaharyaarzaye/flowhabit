@@ -679,23 +679,15 @@ export default function LandingPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
               >
-                <SignedOut>
-                  <SignUpButton mode="modal">
-                    <button className="group inline-flex items-center justify-center gap-2 text-base font-semibold bg-gradient-to-r from-primary to-purple-500 text-white px-8 py-3.5 rounded-2xl hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-[1.03] active:scale-[0.98]">
-                      Start Tracking — It&apos;s Free
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </SignUpButton>
-                </SignedOut>
-                <SignedIn>
-                  <Link
-                    href="/dashboard"
-                    className="group inline-flex items-center justify-center gap-2 text-base font-semibold bg-gradient-to-r from-primary to-purple-500 text-white px-8 py-3.5 rounded-2xl hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-[1.03] active:scale-[0.98]"
-                  >
-                    Go to Dashboard
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </SignedIn>
+                <Link
+                  href="/dashboard"
+                  className="group inline-flex items-center justify-center gap-2 text-base font-semibold bg-linear-to-r from-primary to-purple-500 text-white px-8 py-3.5 rounded-2xl hover:shadow-2xl hover:shadow-primary/30 transition-all hover:scale-[1.03] active:scale-[0.98]"
+                >
+                  Start Tracking — It&apos;s Free
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </motion.div>
+              <motion.div>
                 <a
                   href="#features"
                   className="inline-flex items-center justify-center gap-2 text-base font-medium text-muted-foreground px-6 py-3.5 rounded-2xl border border-border/50 hover:border-primary/30 hover:text-foreground transition-all"
