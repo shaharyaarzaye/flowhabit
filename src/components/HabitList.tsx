@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Plus, Check, MoreVertical, Edit2, Trash2, X, Zap, BarChart3 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import AddHabitModal from "./AddHabitModal";
@@ -26,6 +26,22 @@ export default function HabitList() {
     const [editName, setEditName] = useState("");
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [isPremium, setIsPremium] = useState(false);
+    const [sortBy, setSortBy] = useState<"name" | "color" | "score">("name");
+    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+    const sortedHabits = useMemo(() => {
+        return [...habits].sort((a, b) => {
+            let result = 0;
+            if (sortBy === "score") {
+                result = (a.score || 0) - (b.score || 0);
+            } else if (sortBy === "name") {
+                result = String(a.name || "").localeCompare(String(b.name || ""));
+            } else {
+                result = String(a.color || "").localeCompare(String(b.color || ""));
+            }
+            return sortOrder === "asc" ? result : -result;
+        });
+    }, [habits, sortBy, sortOrder]);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -114,6 +130,7 @@ export default function HabitList() {
             if (user) {
                 const data = await getHabits(); // Returns habits with history
                 setHabits(data);
+                console.log(data)
                 fetchPremiumStatus();
             }
         } catch (error) {
@@ -270,7 +287,7 @@ export default function HabitList() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto py-8 px-2 sm:px-4 pb-32">
+        <div className="max-w-4xl mx-auto py-8 px-2 sm:px-4 pb-32">
 
             {/* Header */}
             <header className="flex items-center justify-between mb-8 px-2 sm:px-0">
@@ -318,9 +335,33 @@ export default function HabitList() {
                 </div>
             </header>
 
+            {/* Sorting Tabs */}
+            <div className="mb-4 px-2 sm:px-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-semibold">Sort by:</span>
+                    {(["name", "color", "score"] as const).map((option) => (
+                        <button
+                            key={option}
+                            type="button"
+                            onClick={() => setSortBy(option)}
+                            className={`px-3 py-1 rounded-full border text-[11px] transition ${sortBy === option ? "bg-foreground text-background border-foreground" : "bg-card border-border text-muted-foreground hover:border-foreground hover:text-foreground"}`}
+                        >
+                            {option.charAt(0).toUpperCase() + option.slice(1)}
+                        </button>
+                    ))}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                    className="self-start sm:self-auto inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground transition"
+                >
+                    {sortOrder === "asc" ? "Ascending" : "Descending"}
+                </button>
+            </div>
+
             {/* Grid Header */}
-            <div className="grid grid-cols-[1fr_repeat(4,28px)_20px] sm:grid-cols-[1.5fr_repeat(6,minmax(36px,1fr))_36px] gap-1 sm:gap-1.5 mb-4 px-2 sm:px-4 sm:overflow-visible">
-                <div className="text-muted-foreground text-[10px] sm:text-xs font-medium  tracking-wider self-end pb-2">Habits</div>
+            <div className="grid grid-cols-[1fr_repeat(4,28px)_20px] sm:grid-cols-[3fr_repeat(6,minmax(26px,1fr))_36px] gap-1 sm:gap-1.5 mb-4 px-2 sm:px-4 sm:overflow-visible">
+                <div className="text-muted-foreground text-[20px] sm:text-xs font-medium  tracking-wider self-end pb-2">Habits</div>
                 {dates.map((date, i) => {
                     const hiddenClass = i < 2 ? "hidden sm:flex" : "flex";
                     return (
@@ -335,14 +376,15 @@ export default function HabitList() {
                 <div className="w-[20px] sm:w-[40px]"></div>
             </div>
 
+            {/* Habit Lists */}
             <div className="space-y-3">
                 <AnimatePresence mode="popLayout">
                     {isLoading ? (
                         [1, 2, 3].map((i) => (
                             <div key={i} className="h-16 bg-card border border-border rounded-2xl animate-pulse shadow-sm" />
                         ))
-                    ) : habits.length > 0 ? (
-                        habits.map((habit) => (
+                    ) : sortedHabits.length > 0 ? (
+                        sortedHabits.map((habit) => (
                             <motion.div
                                 layout
                                 initial={{ opacity: 0, scale: 0.95 }}
@@ -352,10 +394,11 @@ export default function HabitList() {
                                 className="group relative bg-card border border-border rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
                             >
                                 {/* Mobile: Name takes remaining space, dates are compact (28px), action is minimal (20px) */}
-                                <div className="grid grid-cols-[1fr_repeat(4,28px)_20px] sm:grid-cols-[1.5fr_repeat(6,minmax(36px,1fr))_36px] gap-1 sm:gap-1.5 p-2 sm:p-3 items-center relative z-10 bg-card">
+                                <div className="grid grid-cols-[1fr_repeat(4,28px)_20px] sm:grid-cols-[3fr_repeat(6,minmax(26px,1fr))_36px] gap-1 sm:gap-1.5 py-2 px-2 sm:px-4 sm:overflow-visible">
+         
                                     <div className="flex items-center gap-2 sm:gap-3 overflow-hidden pr-1 sm:pr-2">
                                         {/* Circular Score Indicator */}
-                                        {/* <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0">
+                                        <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0">
                                             <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                                                 <path
                                                     className="text-muted/20"
@@ -378,7 +421,7 @@ export default function HabitList() {
                                                     {habit.score}%
                                                 </span>
                                             </div>
-                                        </div> */}
+                                        </div>
 
                                         <div className="flex-1 min-w-0">
                                             <Link href={`/habits/${habit.id}`} className="truncate text-xs sm:text-sm font-bold hover:underline decoration-muted-foreground/50 underline-offset-4 decoration-2 block pr-5 leading-snug">
@@ -412,7 +455,7 @@ export default function HabitList() {
                                                         relative w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all duration-300
                                                         ${isCompleted
                                                             ? "text-white shadow-sm scale-100"
-                                                            : "bg-muted/30 border-2 border-transparent hover:border-muted-foreground/20 scale-90 hover:scale-100"
+                                                            : "bg-muted/80 border-2 border-transparent hover:border-muted-foreground/20 scale-90 hover:scale-100"
                                                         }
                                                     `}
                                                     style={isCompleted ? { backgroundColor: habit.color } : {}}
