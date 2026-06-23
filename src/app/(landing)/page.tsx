@@ -657,7 +657,7 @@ export default function LandingPage() {
                 transition={{ duration: 0.6, delay: 0.1 }}
               >
                 Build Better Habits.{" "}
-                <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                <span className="bg-linear-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
                   Transform Your Life.
                 </span>
               </motion.h1>

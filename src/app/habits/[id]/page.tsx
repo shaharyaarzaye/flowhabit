@@ -176,8 +176,7 @@ export default function HabitDetailsPage() {
     const [saving, setSaving] = useState(false);
 
     // Today toggle
-    const [toggling, setToggling] = useState(false);
-
+    const [toggling, setToggling] = useState(false);    const [isLocalHabit, setIsLocalHabit] = useState(false);
     // Calendar scroll ref — keep the heatmap scrolled to the current month/week on load
     const calendarRef = useRef<HTMLDivElement | null>(null);
 
@@ -188,11 +187,15 @@ export default function HabitDetailsPage() {
         const data = await getHabitDetails(habitId);
         if (data) {
             setHabit(data);
+            setIsLocalHabit(false);
         } else {
             const stored = localStorage.getItem("localHabits");
             if (stored) {
                 const found = JSON.parse(stored).find((h: any) => h.id === habitId);
-                if (found) setHabit(processLocalStats(found));
+                if (found) {
+                    setHabit(processLocalStats(found));
+                    setIsLocalHabit(true);
+                }
             }
         }
         setLoading(false);
@@ -210,6 +213,42 @@ export default function HabitDetailsPage() {
         });
     }, [habit]);
 
+    const updateLocalHabitCompletion = async (dateStr: string, isCompleted: boolean, value?: number) => {
+        const stored = localStorage.getItem("localHabits");
+        if (!stored) return;
+
+        const habits = JSON.parse(stored) as any[];
+        const habitIndex = habits.findIndex((h: any) => h.id === habitId);
+        if (habitIndex === -1) return;
+
+        const updatedHabit = { ...habits[habitIndex] };
+        const recentHistory = { ...updatedHabit.recentHistory };
+
+        if (isCompleted) {
+            recentHistory[dateStr] = { completed: true, value: value ?? null };
+        } else {
+            delete recentHistory[dateStr];
+        }
+
+        updatedHabit.recentHistory = recentHistory;
+        habits[habitIndex] = updatedHabit;
+        localStorage.setItem("localHabits", JSON.stringify(habits));
+        setHabit(processLocalStats(updatedHabit));
+    };
+
+    const hydrateHabitWithLogs = (existingHabit: any, logs: string[], recentHistory?: Record<string, any>) => {
+        const history: Record<string, { completed: boolean; value: number | null }> = {};
+        logs.forEach((dateStr) => {
+            const existingEntry = recentHistory?.[dateStr];
+            history[dateStr] = {
+                completed: true,
+                value: existingEntry?.value ?? null
+            };
+        });
+
+        return processLocalStats({ ...existingHabit, recentHistory: history });
+    };
+
     const handleToggleToday = async () => {
         if (!habit || toggling) return;
         setToggling(true);
@@ -223,8 +262,78 @@ export default function HabitDetailsPage() {
             value = parseInt(val) || 0;
         }
 
-        await toggleHabitCompletion(habitId!, todayStr, !isCompletedToday, value);
-        await fetchHabit();
+        const updatedLogs = isCompletedToday
+            ? habit.logs.filter((d: string) => d !== todayStr)
+            : [...(habit.logs || []), todayStr].sort();
+
+        const newHabitState = hydrateHabitWithLogs(habit, updatedLogs, {
+            ...(habit.recentHistory || {}),
+            ...(isCompletedToday ? {} : { [todayStr]: { completed: true, value: value ?? null } }),
+        });
+
+        setHabit(newHabitState);
+
+        if (isLocalHabit) {
+            await updateLocalHabitCompletion(todayStr, !isCompletedToday, value);
+            setToggling(false);
+            return;
+        }
+
+        const result = await toggleHabitCompletion(habitId!, todayStr, !isCompletedToday, value);
+        if (!result?.success) {
+            if (result?.error === "Unauthorized") {
+                await updateLocalHabitCompletion(todayStr, !isCompletedToday, value);
+            } else {
+                console.error(result?.error || "Failed to toggle habit");
+            }
+        } else {
+            await fetchHabit();
+        }
+        setToggling(false);
+    };
+
+    const handleToggleDate = async (dateStr: string, isCompleted: boolean) => {
+        if (!habit || toggling) return;
+        const date = parseISO(dateStr);
+        const formattedDate = format(date, "MMM d, yyyy");
+        const actionLabel = isCompleted ? 'unmark' : 'mark complete';
+        if (!confirm(`Do you want to ${actionLabel} the habit for ${formattedDate}?`)) return;
+
+        setToggling(true);
+        let value: number | undefined;
+        if (!isCompleted && habit.type === "quantitative") {
+            const val = prompt(`Enter value for ${habit.unit || 'completion'} on ${format(date, "MMM d")}`, habit.goalValue?.toString());
+            if (val === null) { setToggling(false); return; }
+            value = parseInt(val) || 0;
+        }
+
+        const updatedLogs = isCompleted
+            ? habit.logs.filter((d: string) => d !== dateStr)
+            : [...(habit.logs || []), dateStr].sort();
+
+        const newHabitState = hydrateHabitWithLogs(habit, updatedLogs, {
+            ...(habit.recentHistory || {}),
+            ...(isCompleted ? {} : { [dateStr]: { completed: true, value: value ?? null } }),
+        });
+
+        setHabit(newHabitState);
+
+        if (isLocalHabit) {
+            await updateLocalHabitCompletion(dateStr, !isCompleted, value);
+            setToggling(false);
+            return;
+        }
+
+        const result = await toggleHabitCompletion(habitId!, dateStr, !isCompleted, value);
+        if (!result?.success) {
+            if (result?.error === "Unauthorized") {
+                await updateLocalHabitCompletion(dateStr, !isCompleted, value);
+            } else {
+                console.error(result?.error || "Failed to toggle habit");
+            }
+        } else {
+            await fetchHabit();
+        }
         setToggling(false);
     };
 
@@ -707,7 +816,7 @@ export default function HabitDetailsPage() {
                                                     lastMonth = m;
                                                 }
                                             }
-                                            weekDays.push({ dayNum: format(cellDate, "d"), isCompleted, isFuture });
+                                            weekDays.push({ dayNum: format(cellDate, "d"), isCompleted, isFuture, dateStr });
                                         }
                                         weeks.push(weekDays);
                                     }
@@ -724,11 +833,13 @@ export default function HabitDetailsPage() {
                                                 {weeks.map((week, wIndex) => (
                                                     <div key={wIndex} className="flex flex-col gap-[3px]">
                                                         {week.map((day: any, dIndex: number) => (
-                                                            <div
+                                                            <button
                                                                 key={`${wIndex}-${dIndex}`}
-                                                                className={`w-[18px] h-[18px] rounded-[3px] transition-all duration-300 ${day.isFuture ? 'opacity-0' :
-                                                                        day.isCompleted ? '' : 'bg-muted/15'
-                                                                    }`}
+                                                                type="button"
+                                                                onClick={() => !day.isFuture && handleToggleDate(day.dateStr, day.isCompleted)}
+                                                                disabled={day.isFuture || toggling}
+                                                                aria-label={day.isFuture ? `Future date ${day.dayNum}` : `${day.isCompleted ? 'Completed' : 'Not completed'} on ${day.dayNum}`}
+                                                                className={`w-[18px] h-[18px] rounded-[3px] transition-all duration-300 focus:outline-none ${day.isFuture ? 'opacity-0 cursor-default' : 'cursor-pointer hover:scale-105'} ${day.isCompleted ? '' : 'bg-muted/15'}`}
                                                                 style={{ backgroundColor: day.isCompleted ? habit.color : undefined }}
                                                                 title={day.isFuture ? '' : `${day.isCompleted ? '✓' : '✗'}`}
                                                             />
